@@ -17,4 +17,8 @@ class CalidadCafeCreate(BaseModel):
         None,
         description="Notas de cata libres, ej: chocolate, caramelo, cítrico"
     )
+    proceso: str = Field(
+        None,
+        description="descripcion de su proceso en el beneficio"
+    )
     observacion: Optional[str] = None

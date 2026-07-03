@@ -31,6 +31,7 @@ def guardar_calidad(
         puntaje_sensorial=data.puntaje_sensorial,
         perfil_tueste=data.perfil_tueste,
         notas_cata=data.notas_cata,
+        proceso=data.proceso,
         observacion=data.observacion
     )
     db.add(nuevo)
@@ -67,6 +68,7 @@ def historial_calidad(
             "puntaje_sensorial": r.puntaje_sensorial,
             "perfil_tueste": r.perfil_tueste,
             "notas_cata": r.notas_cata,
+            "proceso": r.proceso,
             "observacion": r.observacion
         }
         for r in registros
@@ -96,7 +98,8 @@ def grafica_calidad(
             "fecha": r.created_at.strftime("%Y-%m-%d %H:%M"),
             "puntaje_sensorial": r.puntaje_sensorial,
             "perfil_tueste": r.perfil_tueste,
-            "notas_cata": r.notas_cata
+            "notas_cata": r.notas_cata,
+            "proceso": r.proceso
         }
         for r in registros
     ]
@@ -128,7 +131,8 @@ def calidad_publica(
             "fecha": r.created_at.strftime("%d/%m/%Y"),
             "puntaje_sensorial": r.puntaje_sensorial,
             "perfil_tueste": r.perfil_tueste,
-            "notas_cata": r.notas_cata
+            "notas_cata": r.notas_cata,
+            "proceso": r.proceso
         }
         for r in registros
     ]
@@ -153,7 +157,8 @@ def grafica_calidad_publica(
             "fecha": r.created_at.strftime("%d/%m"),
             "puntaje_sensorial": r.puntaje_sensorial,
             "perfil_tueste": r.perfil_tueste,
-            "notas_cata": r.notas_cata
+            "notas_cata": r.notas_cata,
+            "proceso": r.proceso
         }
         for r in registros
     ]

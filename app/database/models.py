@@ -25,6 +25,7 @@ class Finca(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"))
     nombre_finca = Column(String, nullable=False)
+    altura_finca = Column(String)
     municipio = Column(String)
     vereda = Column(String)
     descripcion = Column(Text)
@@ -68,6 +69,9 @@ class CalidadCafe(Base):
 
     # Notas de cata: descripción libre (ej. "chocolate, caramelo, cítrico")
     notas_cata = Column(Text, nullable=True)
+
+    # proceso: descripción libre (ej. "descripcion proceso de beneficio")
+    proceso = Column(Text, nullable=True)
 
     # Observaciones adicionales del evaluador
     observacion = Column(Text, nullable=True)

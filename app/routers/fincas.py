@@ -1,155 +1,115 @@
-from fastapi import (
-    APIRouter,
-    Depends,
-    UploadFile,
-    File,
-    HTTPException
-)
-
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
-import os
-import shutil
+from typing import List
+import os, shutil
 
 from app.database.connection import get_db
-from app.database.models import Finca, Usuario
-from app.schemas.finca_schema import FincaCreate
-from app.routers.auth import get_current_user
-
-router = APIRouter(
-    prefix="/fincas",
-    tags=["Fincas"]
+from app.database.models import Finca
+from app.schemas.finca_schema import (
+    FincaCreate, FincaPublicResponse, FincaResponse
 )
 
-# ==========================
-# CREAR FINCA
-# ==========================
-@router.post("/")
-def crear_finca(
-    finca: FincaCreate,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
-):
-    nueva_finca = Finca(
-        usuario_id=current_user.id,
-        nombre_finca=finca.nombre_finca,
-        municipio=finca.municipio,
-        vereda=finca.vereda,
-        descripcion=finca.descripcion,
-        variedad_cafe=finca.variedad_cafe   # ← NUEVO
-    )
-    db.add(nueva_finca)
-    db.commit()
-    db.refresh(nueva_finca)
+# ── get_current_user ─────────────────────────────────────────
+# En la mayoría de proyectos FastAPI está en auth.py
+# Si te da error cambia esta línea por la ubicación correcta:
+#   from app.utils.dependencies import get_current_user
+#   from app.routers.auth import get_current_user
+from app.routers.auth import get_current_user
 
-    return {
-        "message": "Finca creada correctamente",
-        "finca_id": nueva_finca.id
-    }
+router = APIRouter(prefix="/fincas", tags=["Fincas"])
 
-# ==========================
-# LISTAR MIS FINCAS
-# ==========================
-@router.get("/")
-def obtener_mis_fincas(
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
-):
-    fincas = db.query(Finca).filter(
-        Finca.usuario_id == current_user.id
-    ).all()
+UPLOAD_DIR = "uploads/fincas"
 
-    return [
-        {
-            "id": f.id,
-            "nombre_finca": f.nombre_finca,
-            "municipio": f.municipio,
-            "vereda": f.vereda,
-            "descripcion": f.descripcion,
-            "variedad_cafe": f.variedad_cafe,   # ← NUEVO
-            "imagen_url": f.imagen_url
-        }
-        for f in fincas
-    ]
 
-# ==========================
-# OBTENER MI FINCA
-# ==========================
-@router.get("/mi-finca")
+# ── GET /fincas/public ────────────────────────────────────────
+# Sin token — usado por la página web para mostrar tarjetas
+@router.get("/public", response_model=List[FincaPublicResponse])
+def listar_fincas_publicas(db: Session = Depends(get_db)):
+    fincas = db.query(Finca).all()
+    resultado = []
+    for f in fincas:
+        resultado.append({
+            "id":                f.id,
+            "nombre":            f.nombre_finca,
+            "altura":            f.altura_finca or "—",
+            "ubicacion":         f"{f.municipio}, {f.vereda}"
+                                 if f.municipio and f.vereda
+                                 else (f.municipio or f.vereda or "—"),
+            "descripcion":       f.descripcion,
+            "variedad_cafe":     f.variedad_cafe,
+            "foto":              f.imagen_url,
+            # Datos del propietario via relación usuario (definida en models.py)
+            "nombre_productor":  f.usuario.nombre  if f.usuario else None,
+            "celular_productor": f.usuario.celular if f.usuario else None,
+        })
+    return resultado
+
+
+# ── GET /fincas/mi-finca ──────────────────────────────────────
+# Con token — usado por la app móvil
+@router.get("/mi-finca", response_model=FincaResponse)
 def obtener_mi_finca(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    usuario_actual = Depends(get_current_user)
 ):
     finca = db.query(Finca).filter(
-        Finca.usuario_id == current_user.id
+        Finca.usuario_id == usuario_actual.id
     ).first()
-
     if not finca:
+        raise HTTPException(status_code=404, detail="Finca no encontrada")
+    return finca
+
+
+# ── POST /fincas ──────────────────────────────────────────────
+@router.post("/", response_model=FincaResponse)
+def crear_finca(
+    datos: FincaCreate,
+    db: Session = Depends(get_db),
+    usuario_actual = Depends(get_current_user)
+):
+    existente = db.query(Finca).filter(
+        Finca.usuario_id == usuario_actual.id
+    ).first()
+    if existente:
         raise HTTPException(
-            status_code=404,
-            detail="No tienes finca registrada"
+            status_code=400,
+            detail="Ya tienes una finca registrada"
         )
+    nueva = Finca(
+        usuario_id    = usuario_actual.id,
+        nombre_finca  = datos.nombre_finca,
+        altura_finca  = datos.altura_finca,
+        municipio     = datos.municipio,
+        vereda        = datos.vereda,
+        descripcion   = datos.descripcion,
+        variedad_cafe = datos.variedad_cafe,
+    )
+    db.add(nueva)
+    db.commit()
+    db.refresh(nueva)
+    return nueva
 
-    return {
-        "id": finca.id,
-        "nombre_finca": finca.nombre_finca,
-        "municipio": finca.municipio,
-        "vereda": finca.vereda,
-        "descripcion": finca.descripcion,
-        "variedad_cafe": finca.variedad_cafe,   # ← NUEVO
-        "imagen_url": finca.imagen_url
-    }
 
-# ==========================
-# SUBIR FOTO FINCA
-# ==========================
+# ── POST /fincas/upload-foto/{finca_id} ───────────────────────
 @router.post("/upload-foto/{finca_id}")
-def subir_foto_finca(
+def subir_foto(
     finca_id: int,
     foto: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    usuario_actual = Depends(get_current_user)
 ):
-    finca = db.query(Finca).filter(Finca.id == finca_id).first()
-
+    finca = db.query(Finca).filter(
+        Finca.id == finca_id,
+        Finca.usuario_id == usuario_actual.id
+    ).first()
     if not finca:
         raise HTTPException(status_code=404, detail="Finca no encontrada")
-    if finca.usuario_id != current_user.id:
-        raise HTTPException(status_code=403, detail="No autorizado")
 
-    os.makedirs("uploads/fincas", exist_ok=True)
-
-    extension = foto.filename.split(".")[-1]
-    nombre_archivo = f"finca_{finca_id}.{extension}"
-    ruta = os.path.join("uploads", "fincas", nombre_archivo)
-
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    ruta = f"{UPLOAD_DIR}/finca_{finca_id}.jpg"
     with open(ruta, "wb") as buffer:
         shutil.copyfileobj(foto.file, buffer)
 
     finca.imagen_url = ruta
     db.commit()
-
-    return {
-        "message": "Foto subida correctamente",
-        "ruta": ruta
-    }
-
-# ==========================
-# PÚBLICO — TODAS LAS FINCAS
-# ==========================
-@router.get("/public")
-def obtener_fincas_publicas(
-    db: Session = Depends(get_db)
-):
-    fincas = db.query(Finca).all()
-
-    return [
-        {
-            "id": f.id,
-            "nombre": f.nombre_finca,
-            "ubicacion": f"{f.vereda}, {f.municipio}",
-            "descripcion": f.descripcion,
-            "variedad_cafe": f.variedad_cafe,   # ← NUEVO
-            "foto": f.imagen_url
-        }
-        for f in fincas
-    ]
+    return {"message": "Foto subida correctamente", "url": ruta}
