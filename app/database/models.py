@@ -37,6 +37,7 @@ class Finca(Base):
     fermentaciones = relationship("Fermentacion", back_populates="finca")
     imagenes = relationship("ImagenFinca", back_populates="finca")
     calidades = relationship("CalidadCafe", back_populates="finca")  # ← NUEVO
+    secados = relationship("Secado", back_populates="finca")
 
 # ==========================
 # TABLA FERMENTACION
@@ -91,3 +92,21 @@ class ImagenFinca(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     finca = relationship("Finca", back_populates="imagenes")
+
+
+# También agrega esta relación dentro de class Finca:
+
+
+# ==========================
+# TABLA SECADO
+# ==========================
+class Secado(Base):
+    __tablename__ = "secado"
+    id                  = Column(Integer, primary_key=True, index=True)
+    finca_id            = Column(Integer, ForeignKey("fincas.id"), nullable=False)
+    humedad             = Column(Float, nullable=False)   # % humedad del grano
+    factor_rendimiento  = Column(Float, nullable=False)   # factor de rendimiento
+    observacion         = Column(Text, nullable=True)
+    created_at          = Column(DateTime, default=datetime.utcnow)
+
+    finca = relationship("Finca", back_populates="secados")
