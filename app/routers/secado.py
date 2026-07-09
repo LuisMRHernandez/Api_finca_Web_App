@@ -104,3 +104,23 @@ def obtener_grafica(
         )
         for r in registros
     ]
+
+@router.get("/public/grafica/{finca_id}")
+def obtener_grafica_publica(
+    finca_id: int,
+    db: Session = Depends(get_db)
+):
+    datos = (
+        db.query(Secado)
+        .filter(Secado.finca_id == finca_id)
+        .order_by(Secado.created_at.asc())
+        .all()
+    )
+    return [
+        {
+            "humedad": r.humedad,
+            "factor_rendimiento": r.factor_rendimiento,
+            "fecha": r.created_at.strftime("%Y-%m-%d %H:%M")
+        }
+        for r in datos
+    ]
