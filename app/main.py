@@ -6,12 +6,13 @@ from app.database.models import Base
 from app.routers import auth
 from app.routers import fincas
 from app.routers import fermentacion
-from app.routers import calidad               # ← NUEVO
+from app.routers import calidad
+from app.routers import secado               # ← NUEVO
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-# Crear tablas (incluye la nueva tabla calidad_cafe)
+# Crear tablas automáticamente (incluye secado)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -36,7 +37,8 @@ app.mount(
 app.include_router(auth.router)
 app.include_router(fincas.router)
 app.include_router(fermentacion.router)
-app.include_router(calidad.router)            # ← NUEVO
+app.include_router(calidad.router)
+app.include_router(secado.router)            # ← NUEVO
 
 @app.get("/")
 def home():
