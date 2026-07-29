@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -29,15 +29,54 @@ class Finca(Base):
     municipio = Column(String)
     vereda = Column(String)
     descripcion = Column(Text)
-    variedad_cafe = Column(String, nullable=True)    # ← NUEVO
+    variedad_cafe = Column(String, nullable=True)   
     imagen_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     usuario = relationship("Usuario", back_populates="fincas")
     fermentaciones = relationship("Fermentacion", back_populates="finca")
     imagenes = relationship("ImagenFinca", back_populates="finca")
-    calidades = relationship("CalidadCafe", back_populates="finca")  # ← NUEVO
+    calidades = relationship("CalidadCafe", back_populates="finca")  
     secados = relationship("Secado", back_populates="finca")
+    lotes = relationship("Lote", back_populates="finca")
+
+    # ==========================
+# TABLA LOTES
+# ==========================
+class Lote(Base):
+    __tablename__ = "lotes"
+    id = Column(Integer, primary_key=True, index=True)
+    finca_id = Column(Integer, ForeignKey("fincas.id"), nullable=False)
+    # Nombre del lote (Ej: Lote 1, Lote A, etc.)
+    nombre = Column(String, nullable=False)
+    # Fecha de recolección del café
+    fecha_recoleccion = Column(DateTime, nullable=True)
+    # Cantidad recolectada (kg de café cereza)
+    cantidad_kg = Column(Float, nullable=True)
+    # Estado del lote
+    estado = Column(
+        String,
+        default="Fermentación"
+    )  # Fermentación, Secado, Finalizado
+
+    observacion = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relaciones
+    finca = relationship("Finca", back_populates="lotes")
+
+    fermentaciones = relationship(
+        "Fermentacion",
+        back_populates="lote",
+        cascade="all, delete-orphan"
+    )
+
+    secados = relationship(
+        "Secado",
+        back_populates="lote",
+        cascade="all, delete-orphan"
+    )
 
 # ==========================
 # TABLA FERMENTACION
@@ -46,6 +85,7 @@ class Fermentacion(Base):
     __tablename__ = "fermentacion"
     id = Column(Integer, primary_key=True, index=True)
     finca_id = Column(Integer, ForeignKey("fincas.id"))
+    lote_id = Column(Integer, ForeignKey("lotes.id"), nullable=True)
     brix = Column(Float)
     ph = Column(Float)
     temperatura = Column(Float)
@@ -53,30 +93,25 @@ class Fermentacion(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     finca = relationship("Finca", back_populates="fermentaciones")
+    lote = relationship("Lote", back_populates="fermentaciones")
 
 # ==========================
-# TABLA CALIDAD CAFÉ          ← NUEVO
+# TABLA CALIDAD CAFÉ          
 # ==========================
 class CalidadCafe(Base):
     __tablename__ = "calidad_cafe"
     id = Column(Integer, primary_key=True, index=True)
     finca_id = Column(Integer, ForeignKey("fincas.id"), nullable=False)
-
     # Puntuación global de calidad sensorial (escala 0-100, estándar SCA)
     puntaje_sensorial = Column(Float, nullable=False)
-
     # Perfil de tueste: claro / medio / medio-oscuro / oscuro
     perfil_tueste = Column(String, nullable=False)
-
     # Notas de cata: descripción libre (ej. "chocolate, caramelo, cítrico")
     notas_cata = Column(Text, nullable=True)
-
     # proceso: descripción libre (ej. "descripcion proceso de beneficio")
     proceso = Column(Text, nullable=True)
-
     # Observaciones adicionales del evaluador
     observacion = Column(Text, nullable=True)
-
     created_at = Column(DateTime, default=datetime.utcnow)
 
     finca = relationship("Finca", back_populates="calidades")
@@ -93,20 +128,18 @@ class ImagenFinca(Base):
 
     finca = relationship("Finca", back_populates="imagenes")
 
-
-# También agrega esta relación dentro de class Finca:
-
-
 # ==========================
 # TABLA SECADO
 # ==========================
 class Secado(Base):
     __tablename__ = "secado"
-    id                  = Column(Integer, primary_key=True, index=True)
-    finca_id            = Column(Integer, ForeignKey("fincas.id"), nullable=False)
-    humedad             = Column(Float, nullable=False)   # % humedad del grano
-    factor_rendimiento  = Column(Float, nullable=False)   # factor de rendimiento
-    observacion         = Column(Text, nullable=True)
-    created_at          = Column(DateTime, default=datetime.utcnow)
+    id = Column(Integer, primary_key=True, index=True)
+    finca_id = Column(Integer, ForeignKey("fincas.id"), nullable=False)
+    lote_id = Column(Integer, ForeignKey("lotes.id"), nullable=True)
+    humedad   = Column(Float, nullable=False)   # % humedad del grano
+    factor_rendimiento = Column(Float, nullable=False)   # factor de rendimiento
+    observacion = Column(Text, nullable=True)
+    created_at  = Column(DateTime, default=datetime.utcnow)
 
     finca = relationship("Finca", back_populates="secados")
+    lote = relationship("Lote", back_populates="secados")

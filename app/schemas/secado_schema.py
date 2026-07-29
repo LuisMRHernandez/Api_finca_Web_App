@@ -1,12 +1,12 @@
 from pydantic import BaseModel, validator
 from typing import Optional
-from datetime import datetime
 
 
 class SecadoCreate(BaseModel):
     finca_id:           int
-    humedad:            float   # % — rango normal café: 10 – 12.5 %
-    factor_rendimiento: float   # rango normal: 0 – 100
+    lote_id:            Optional[int] = None   # ← NUEVO
+    humedad:            float
+    factor_rendimiento: float
     observacion:        Optional[str] = None
 
     @validator('humedad')
@@ -25,10 +25,11 @@ class SecadoCreate(BaseModel):
 class SecadoResponse(BaseModel):
     id:                 int
     finca_id:           int
+    lote_id:            Optional[int] = None   # ← NUEVO
     humedad:            float
     factor_rendimiento: float
     observacion:        Optional[str] = None
-    fecha:              str   # formateado como string para la app y la web
+    fecha:              str
 
     class Config:
         from_attributes = True
