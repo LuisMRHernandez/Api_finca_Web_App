@@ -40,25 +40,28 @@ class Finca(Base):
     secados = relationship("Secado", back_populates="finca")
     lotes = relationship("Lote", back_populates="finca")
 
-    # ==========================
-# TABLA LOTES
 # ==========================
+# TABLA LOTES — corregida
+# ==========================
+
 class Lote(Base):
     __tablename__ = "lotes"
     id = Column(Integer, primary_key=True, index=True)
     finca_id = Column(Integer, ForeignKey("fincas.id"), nullable=False)
-    # Nombre del lote (Ej: Lote 1, Lote A, etc.)
     nombre = Column(String, nullable=False)
-    # Fecha de recolección del café
+
+    # ── Campos que faltaban (los usa lotes.py / lote_schema.py) ──
+    variedad = Column(String, nullable=True)
+    fecha_inicio = Column(DateTime, nullable=True)
+    activo = Column(Boolean, default=True, nullable=False)
+
+    # ── Campos existentes (se conservan) ──
     fecha_recoleccion = Column(DateTime, nullable=True)
-    # Cantidad recolectada (kg de café cereza)
     cantidad_kg = Column(Float, nullable=True)
-    # Estado del lote
     estado = Column(
         String,
         default="Fermentación"
     )  # Fermentación, Secado, Finalizado
-
     observacion = Column(Text, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)

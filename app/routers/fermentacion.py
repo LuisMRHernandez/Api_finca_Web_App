@@ -110,19 +110,8 @@ def obtener_datos_grafica(
 # =====================
 # ENDPOINTS PÚBLICOS (sin JWT) — ANTES de /{finca_id}
 # =====================
-@router.get("/public/{finca_id}")
-def obtener_fermentacion_publica(
-    finca_id: int,
-    db: Session = Depends(get_db)
-):
-    datos = (
-        db.query(Fermentacion)
-        .filter(Fermentacion.finca_id == finca_id)
-        .order_by(Fermentacion.created_at.desc())
-        .limit(10)
-        .all()
-    )
-    return datos
+import logging
+logger = logging.getLogger("fermentacion")
 
 @router.get("/public/grafica/{finca_id}")
 def obtener_grafica_publica(
@@ -135,15 +124,20 @@ def obtener_grafica_publica(
         .order_by(Fermentacion.created_at.asc())
         .all()
     )
-    return [
-        {
-            "ph": d.ph,
-            "brix": d.brix,
-            "temperatura": d.temperatura,
-            "fecha": d.created_at.strftime("%d/%m")
-        }
-        for d in datos
-    ]
+    resultado = []
+    for d in datos:
+        try:
+            resultado.append({
+                "ph": d.ph,
+                "brix": d.brix,
+                "temperatura": d.temperatura,
+                # si created_at viniera nulo, no se cae: se omite la fecha
+                "fecha": d.created_at.strftime("%d/%m") if d.created_at else "—"
+            })
+        except Exception as e:
+            logger.error(f"Registro de fermentación id={d.id} omitido por error: {e}")
+            continue
+    return resultado
 
 # =====================
 # HISTORIAL POR FINCA (autenticado) — AL FINAL

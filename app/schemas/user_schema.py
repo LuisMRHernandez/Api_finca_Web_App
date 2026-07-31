@@ -6,14 +6,14 @@ class UserCreate(BaseModel):
     nombre: str
     email: EmailStr
     password: str
-    celular: Optional[str] = None       # ← NUEVO (opcional al registrarse)
+    celular: Optional[str] = None      
 
 # Respuesta usuario
 class UserResponse(BaseModel):
     id: int
     nombre: str
     email: EmailStr
-    celular: Optional[str] = None       # ← NUEVO
+    celular: Optional[str] = None    
 
     class Config:
         from_attributes = True
