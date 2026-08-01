@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+import logging
 
 from app.database.connection import SessionLocal
 from app.database.models import Fermentacion, Finca
 from app.schemas.fermentacion_schema import FermentacionCreate
 from app.utils.oauth2 import get_current_user
-import logging
+
 logger = logging.getLogger("fermentacion")
 
 router = APIRouter(
@@ -37,7 +38,7 @@ def guardar_fermentacion(
 
     nuevo_registro = Fermentacion(
         finca_id=data.finca_id,
-        lote_id=data.lote_id,  
+        lote_id=data.lote_id,          # ← NUEVO: ahora sí se guarda el lote
         brix=data.brix,
         ph=data.ph,
         temperatura=data.temperatura,
@@ -48,7 +49,8 @@ def guardar_fermentacion(
     db.refresh(nuevo_registro)
     return {
         "message": "Datos guardados correctamente",
-        "registro_id": nuevo_registro.id
+        "registro_id": nuevo_registro.id,
+        "lote_id": nuevo_registro.lote_id
     }
 
 # =====================
@@ -73,6 +75,7 @@ def obtener_historial_fermentacion(
         {
             "id": dato.id,
             "fecha": dato.created_at,
+            "lote_id": dato.lote_id,
             "brix": dato.brix,
             "ph": dato.ph,
             "temperatura": dato.temperatura,
@@ -113,8 +116,19 @@ def obtener_datos_grafica(
 # =====================
 # ENDPOINTS PÚBLICOS (sin JWT) — ANTES de /{finca_id}
 # =====================
-import logging
-logger = logging.getLogger("fermentacion")
+@router.get("/public/{finca_id}")
+def obtener_fermentacion_publica(
+    finca_id: int,
+    db: Session = Depends(get_db)
+):
+    datos = (
+        db.query(Fermentacion)
+        .filter(Fermentacion.finca_id == finca_id)
+        .order_by(Fermentacion.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    return datos
 
 @router.get("/public/grafica/{finca_id}")
 def obtener_grafica_publica(
@@ -134,7 +148,33 @@ def obtener_grafica_publica(
                 "ph": d.ph,
                 "brix": d.brix,
                 "temperatura": d.temperatura,
-                # si created_at viniera nulo, no se cae: se omite la fecha
+                "fecha": d.created_at.strftime("%d/%m") if d.created_at else "—"
+            })
+        except Exception as e:
+            logger.error(f"Registro de fermentación id={d.id} omitido por error: {e}")
+            continue
+    return resultado
+
+# ── GET /fermentacion/public/grafica-lote/{lote_id} ────────────
+# Igual que /public/grafica/{finca_id} pero filtrado por lote específico
+@router.get("/public/grafica-lote/{lote_id}")
+def obtener_grafica_publica_por_lote(
+    lote_id: int,
+    db: Session = Depends(get_db)
+):
+    datos = (
+        db.query(Fermentacion)
+        .filter(Fermentacion.lote_id == lote_id)
+        .order_by(Fermentacion.created_at.asc())
+        .all()
+    )
+    resultado = []
+    for d in datos:
+        try:
+            resultado.append({
+                "ph": d.ph,
+                "brix": d.brix,
+                "temperatura": d.temperatura,
                 "fecha": d.created_at.strftime("%d/%m") if d.created_at else "—"
             })
         except Exception as e:
@@ -160,34 +200,3 @@ def obtener_historial(
     return db.query(Fermentacion).filter(
         Fermentacion.finca_id == finca_id
     ).order_by(Fermentacion.id.asc()).all()
-
-
-
-# ── GET /fermentacion/public/grafica-lote/{lote_id} ────────────
-# Igual que /public/grafica/{finca_id} pero filtrado por lote específico.
-# Ubicar junto a la ruta /public/grafica/{finca_id} existente (ANTES del
-# catch-all "/{finca_id}" que está al final del archivo).
-@router.get("/public/grafica-lote/{lote_id}")
-def obtener_grafica_publica_por_lote(
-    lote_id: int,
-    db: Session = Depends(get_db)
-):
-    datos = (
-        db.query(Fermentacion)
-        .filter(Fermentacion.lote_id == lote_id)
-        .order_by(Fermentacion.created_at.asc())
-        .all()
-    )
-    resultado = []
-    for d in datos:
-        try:
-            resultado.append({
-                "ph": d.ph,
-                "brix": d.brix,
-                "temperatura": d.temperatura,
-                "fecha": d.created_at.strftime("%d/%m") if d.created_at else "—"
-            })
-        except Exception as e:
-            logger.error(f"Registro de fermentación id={d.id} omitido por error: {e}")
-            continue
-    return resultado
