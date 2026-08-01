@@ -30,6 +30,7 @@ def guardar_secado(
 
     nuevo = Secado(
         finca_id           = datos.finca_id,
+        lote_id            =datos.lote_id, 
         humedad            = datos.humedad,
         factor_rendimiento = datos.factor_rendimiento,
         observacion        = datos.observacion,

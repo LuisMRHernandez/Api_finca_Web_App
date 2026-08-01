@@ -37,6 +37,7 @@ def guardar_fermentacion(
 
     nuevo_registro = Fermentacion(
         finca_id=data.finca_id,
+        lote_id=data.lote_id,  
         brix=data.brix,
         ph=data.ph,
         temperatura=data.temperatura,
