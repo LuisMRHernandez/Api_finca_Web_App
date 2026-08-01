@@ -6,6 +6,8 @@ from app.database.connection import get_db
 from app.database.models import Lote, Finca
 from app.schemas.lote_schema import LoteCreate, LoteResponse, LoteCerrarResponse
 from app.routers.auth import get_current_user
+import logging
+logger = logging.getLogger("lotes")
 
 router = APIRouter(prefix="/lotes", tags=["Lotes"])
 
@@ -129,3 +131,33 @@ def cerrar_lote(
     db.commit()
     db.refresh(lote)
     return lote
+
+
+
+# ── GET /lotes/public/{finca_id} — lotes de una finca, sin token ──
+# Ubicar ANTES de cualquier ruta tipo "/{lote_id}" si algún día la agregas
+@router.get("/public/{finca_id}", response_model=List[LoteResponse])
+def obtener_lotes_publicos(
+    finca_id: int,
+    db: Session = Depends(get_db)
+):
+    lotes = db.query(Lote).filter(
+        Lote.finca_id == finca_id
+    ).order_by(Lote.created_at.desc()).all()
+
+    resultado = []
+    for l in lotes:
+        try:
+            resultado.append(LoteResponse(
+                id           = l.id,
+                finca_id     = l.finca_id,
+                nombre       = l.nombre,
+                variedad     = l.variedad,
+                fecha_inicio = l.fecha_inicio.strftime("%Y-%m-%d") if l.fecha_inicio else None,
+                activo       = l.activo,
+                created_at   = l.created_at.strftime("%Y-%m-%d %H:%M") if l.created_at else None,
+            ))
+        except Exception as e:
+            logger.error(f"Lote id={l.id} omitido por error: {e}")
+            continue
+    return resultado

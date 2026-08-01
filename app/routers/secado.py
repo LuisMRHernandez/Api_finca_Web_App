@@ -6,6 +6,8 @@ from app.database.connection import get_db
 from app.database.models import Secado, Finca
 from app.schemas.secado_schema import SecadoCreate, SecadoResponse, SecadoGraficaResponse
 from app.routers.auth import get_current_user   # ajusta si difiere
+import logging
+logger = logging.getLogger("secado")
 
 router = APIRouter(prefix="/secado", tags=["Secado"])
 
@@ -124,3 +126,32 @@ def obtener_grafica_publica(
         }
         for r in datos
     ]
+
+
+
+# ── GET /secado/public/grafica-lote/{lote_id} ───────────────────
+# Igual que /public/grafica/{finca_id} pero filtrado por lote específico.
+# Ubicar junto a la ruta /public/grafica/{finca_id} existente.
+@router.get("/public/grafica-lote/{lote_id}")
+def obtener_grafica_publica_por_lote(
+    lote_id: int,
+    db: Session = Depends(get_db)
+):
+    datos = (
+        db.query(Secado)
+        .filter(Secado.lote_id == lote_id)
+        .order_by(Secado.created_at.asc())
+        .all()
+    )
+    resultado = []
+    for r in datos:
+        try:
+            resultado.append({
+                "humedad": r.humedad,
+                "factor_rendimiento": r.factor_rendimiento,
+                "fecha": r.created_at.strftime("%d/%m") if r.created_at else "—"
+            })
+        except Exception as e:
+            logger.error(f"Registro de secado id={r.id} omitido por error: {e}")
+            continue
+    return resultado
