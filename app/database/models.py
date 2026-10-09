@@ -36,9 +36,10 @@ class Finca(Base):
     usuario = relationship("Usuario", back_populates="fincas")
     fermentaciones = relationship("Fermentacion", back_populates="finca")
     imagenes = relationship("ImagenFinca", back_populates="finca")
-    calidades = relationship("CalidadCafe", back_populates="finca")  
+    calidades = relationship("CalidadCafe", back_populates="finca")
     secados = relationship("Secado", back_populates="finca")
     lotes = relationship("Lote", back_populates="finca")
+    analisis_suelo = relationship("AnalisisSuelo", back_populates="finca")
 
 # ==========================
 # TABLA LOTES — corregida
@@ -77,6 +78,12 @@ class Lote(Base):
 
     secados = relationship(
         "Secado",
+        back_populates="lote",
+        cascade="all, delete-orphan"
+    )
+
+    analisis_suelo = relationship(
+        "AnalisisSuelo",
         back_populates="lote",
         cascade="all, delete-orphan"
     )
@@ -146,3 +153,41 @@ class Secado(Base):
 
     finca = relationship("Finca", back_populates="secados")
     lote = relationship("Lote", back_populates="secados")
+
+# ==========================
+# TABLA ANALISIS DE SUELO (medidor NPK portátil)
+# ==========================
+class AnalisisSuelo(Base):
+    __tablename__ = "analisis_suelo"
+    id = Column(Integer, primary_key=True, index=True)
+    finca_id = Column(Integer, ForeignKey("fincas.id"), nullable=False)
+    lote_id = Column(Integer, ForeignKey("lotes.id"), nullable=True)
+
+    cultivo = Column(String, nullable=False)          # ej. "Cafe", "Uchuva"
+    etapa = Column(String, nullable=False)             # ej. "Floracion", "Vivero / semillero"
+    num_puntos = Column(Integer, nullable=False, default=1)  # puntos de muestreo promediados
+
+    humedad = Column(Float, nullable=True)             # %RH
+    temperatura = Column(Float, nullable=True)         # C
+    ph = Column(Float, nullable=True)
+    ec = Column(Float, nullable=True)                  # uS/cm
+    n_mg_kg = Column(Float, nullable=True)
+    p_mg_kg = Column(Float, nullable=True)
+    k_mg_kg = Column(Float, nullable=True)
+
+    estado_humedad = Column(String, nullable=True)      # BAJO/NORMAL/ALTO/SIN REFERENCIA
+    estado_temperatura = Column(String, nullable=True)
+    estado_ph = Column(String, nullable=True)
+    estado_ec = Column(String, nullable=True)
+
+    recomendacion = Column(Text, nullable=True)         # texto generado por el medidor
+
+    origen = Column(String, nullable=False, default="sensor")       # sensor | manual
+    via_envio = Column(String, nullable=True)                       # wifi | bluetooth
+    dispositivo_id = Column(String, nullable=True)                  # id/MAC del ESP32 que envio el dato
+
+    fecha_medicion = Column(DateTime, nullable=True)    # momento real de la medicion en campo
+    created_at = Column(DateTime, default=datetime.utcnow)          # momento en que llego a la BD
+
+    finca = relationship("Finca", back_populates="analisis_suelo")
+    lote = relationship("Lote", back_populates="analisis_suelo")

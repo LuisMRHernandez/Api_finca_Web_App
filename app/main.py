@@ -3,6 +3,7 @@ from app.database.connection import engine
 from app.database.models import Base
 from app.routers import auth, fincas, fermentacion, calidad, secado
 from app.routers import lotes                          # ← NUEVO
+from app.routers import analisis_suelo                 # ← NUEVO (medidor NPK)
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -22,6 +23,7 @@ app.include_router(fermentacion.router)
 app.include_router(calidad.router)
 app.include_router(secado.router)
 app.include_router(lotes.router)                       # ← NUEVO
+app.include_router(analisis_suelo.router)               # ← NUEVO (medidor NPK)
 
 @app.get("/")
 def home():
