@@ -198,7 +198,7 @@ class AnalisisSuelo(Base):
 # estacion de fermentacion/secado, etc.) — autenticacion por
 # token fijo, sin login de usuario/contraseña desde el dispositivo.
 # ==========================
-class Dispositivos(Base):
+class Dispositivo(Base):
     __tablename__ = "dispositivos"
     id = Column(Integer, primary_key=True, index=True)
     finca_id = Column(Integer, ForeignKey("fincas.id"), nullable=False)
