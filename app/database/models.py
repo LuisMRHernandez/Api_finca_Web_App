@@ -40,6 +40,7 @@ class Finca(Base):
     secados = relationship("Secado", back_populates="finca")
     lotes = relationship("Lote", back_populates="finca")
     analisis_suelo = relationship("AnalisisSuelo", back_populates="finca")
+    dispositivos = relationship("Dispositivo", back_populates="finca")
 
 # ==========================
 # TABLA LOTES — corregida
@@ -191,3 +192,23 @@ class AnalisisSuelo(Base):
 
     finca = relationship("Finca", back_populates="analisis_suelo")
     lote = relationship("Lote", back_populates="analisis_suelo")
+
+# ==========================
+# TABLA DISPOSITIVOS (ESP32 registrados: medidor de suelo,
+# estacion de fermentacion/secado, etc.) — autenticacion por
+# token fijo, sin login de usuario/contraseña desde el dispositivo.
+# ==========================
+class Dispositivos(Base):
+    __tablename__ = "dispositivos"
+    id = Column(Integer, primary_key=True, index=True)
+    finca_id = Column(Integer, ForeignKey("fincas.id"), nullable=False)
+
+    nombre = Column(String, nullable=False)        # ej. "Medidor NPK - Lote 1"
+    tipo = Column(String, nullable=False)           # suelo | beneficio
+    token = Column(String, unique=True, nullable=False, index=True)
+    activo = Column(Boolean, default=True, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    ultima_conexion = Column(DateTime, nullable=True)
+
+    finca = relationship("Finca", back_populates="dispositivos")

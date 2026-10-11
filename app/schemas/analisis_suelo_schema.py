@@ -4,7 +4,11 @@ from datetime import datetime
 
 
 class AnalisisSueloCreate(BaseModel):
-    finca_id: int
+    # finca_id ya NO se usa: se resuelve en el servidor a partir del
+    # token de dispositivo o del usuario autenticado (nunca se confia en
+    # lo que mande el cliente). Se deja opcional solo por compatibilidad
+    # con clientes viejos que todavia lo envien en el body.
+    finca_id: Optional[int] = None
     lote_id: Optional[int] = None
 
     cultivo: str

@@ -1,44 +1,36 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from typing import List
 import logging
 
-from app.database.connection import SessionLocal
+from app.database.connection import get_db
 from app.database.models import AnalisisSuelo, Finca
-from app.schemas.analisis_suelo_schema import AnalisisSueloCreate
-from app.utils.oauth2 import get_current_user
+from app.schemas.analisis_suelo_schema import AnalisisSueloCreate, AnalisisSueloResponse
+from app.utils.device_auth import get_auth_context, ContextoAuth
+from app.routers.auth import get_current_user
 
 logger = logging.getLogger("analisis_suelo")
 
-router = APIRouter(
-    prefix="/analisis-suelo",
-    tags=["Análisis de Suelo"]
-)
+router = APIRouter(prefix="/analisis-suelo", tags=["Análisis de Suelo"])
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # =====================
-# GUARDAR ANALISIS (lo usa el ESP32 directo por WiFi, y la app cuando
-# sincroniza lo que llego por Bluetooth)
+# GUARDAR ANALISIS
+# Acepta DOS formas de autenticacion (ver app/utils/device_auth.py):
+#   - Header "X-Device-Token": el medidor de suelo (ESP32) enviando
+#     directo por WiFi con su token fijo.
+#   - Authorization: Bearer <JWT>: la app movil, cuando sincroniza un
+#     resultado que llego al telefono por Bluetooth.
+# El finca_id SIEMPRE se resuelve aqui, nunca se confia en el body.
 # =====================
-@router.post("/")
+@router.post("/", response_model=AnalisisSueloResponse)
 def guardar_analisis_suelo(
     data: AnalisisSueloCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    auth: ContextoAuth = Depends(get_auth_context),
 ):
-    finca = db.query(Finca).filter(Finca.id == data.finca_id).first()
-    if not finca:
-        raise HTTPException(status_code=404, detail="Finca no encontrada")
-    if finca.usuario_id != current_user["user_id"]:
-        raise HTTPException(status_code=403, detail="No autorizado")
-
     nuevo_registro = AnalisisSuelo(
-        finca_id=data.finca_id,
+        finca_id=auth.finca_id,
         lote_id=data.lote_id,
         cultivo=data.cultivo,
         etapa=data.etapa,
@@ -55,77 +47,81 @@ def guardar_analisis_suelo(
         estado_ph=data.estado_ph,
         estado_ec=data.estado_ec,
         recomendacion=data.recomendacion,
-        origen=data.origen,
-        via_envio=data.via_envio,
-        dispositivo_id=data.dispositivo_id,
+        origen="sensor" if auth.origen == "sensor" else (data.origen or "manual"),
+        via_envio="wifi" if auth.origen == "sensor" else (data.via_envio or "bluetooth"),
+        dispositivo_id=auth.dispositivo_nombre or data.dispositivo_id,
         fecha_medicion=data.fecha_medicion,
     )
     db.add(nuevo_registro)
     db.commit()
     db.refresh(nuevo_registro)
-    return {
-        "message": "Análisis de suelo guardado correctamente",
-        "registro_id": nuevo_registro.id,
-        "finca_id": nuevo_registro.finca_id
-    }
+    return nuevo_registro
+
 
 # =====================
-# HISTORIAL (usuario autenticado, su finca — la primera que tenga)
+# HISTORIAL (app, usuario autenticado con JWT — su finca)
 # =====================
-@router.get("/historial")
+@router.get("/historial", response_model=List[AnalisisSueloResponse])
 def obtener_historial_suelo(
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    usuario_actual=Depends(get_current_user),
 ):
-    finca = db.query(Finca).filter(
-        Finca.usuario_id == current_user["user_id"]
-    ).first()
+    finca = db.query(Finca).filter(Finca.usuario_id == usuario_actual.id).first()
     if not finca:
         raise HTTPException(status_code=404, detail="No tienes finca registrada")
 
-    datos = db.query(AnalisisSuelo).filter(
-        AnalisisSuelo.finca_id == finca.id
-    ).order_by(AnalisisSuelo.created_at.desc()).all()
+    return (
+        db.query(AnalisisSuelo)
+        .filter(AnalisisSuelo.finca_id == finca.id)
+        .order_by(AnalisisSuelo.created_at.desc())
+        .all()
+    )
 
-    return datos
 
 # =====================
-# HISTORIAL POR FINCA (autenticado)
+# HISTORIAL POR FINCA (app)
 # =====================
-@router.get("/{finca_id}")
+@router.get("/{finca_id}", response_model=List[AnalisisSueloResponse])
 def obtener_historial_por_finca(
     finca_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    usuario_actual=Depends(get_current_user),
 ):
     finca = db.query(Finca).filter(Finca.id == finca_id).first()
     if not finca:
         raise HTTPException(status_code=404, detail="Finca no encontrada")
-    if finca.usuario_id != current_user["user_id"]:
+    if finca.usuario_id != usuario_actual.id:
         raise HTTPException(status_code=403, detail="No autorizado")
 
-    return db.query(AnalisisSuelo).filter(
-        AnalisisSuelo.finca_id == finca_id
-    ).order_by(AnalisisSuelo.created_at.desc()).all()
+    return (
+        db.query(AnalisisSuelo)
+        .filter(AnalisisSuelo.finca_id == finca_id)
+        .order_by(AnalisisSuelo.created_at.desc())
+        .all()
+    )
+
 
 # =====================
-# GRAFICA NPK (autenticado) — evolucion de N, P, K y pH en el tiempo
+# GRAFICA NPK (app) — evolucion de N, P, K y pH en el tiempo
 # =====================
 @router.get("/grafica/{finca_id}")
 def obtener_datos_grafica_suelo(
     finca_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    usuario_actual=Depends(get_current_user),
 ):
     finca = db.query(Finca).filter(Finca.id == finca_id).first()
     if not finca:
         raise HTTPException(status_code=404, detail="Finca no encontrada")
-    if finca.usuario_id != current_user["user_id"]:
+    if finca.usuario_id != usuario_actual.id:
         raise HTTPException(status_code=403, detail="No autorizado")
 
-    registros = db.query(AnalisisSuelo).filter(
-        AnalisisSuelo.finca_id == finca_id
-    ).order_by(AnalisisSuelo.created_at.asc()).all()
+    registros = (
+        db.query(AnalisisSuelo)
+        .filter(AnalisisSuelo.finca_id == finca_id)
+        .order_by(AnalisisSuelo.created_at.asc())
+        .all()
+    )
 
     return [
         {
