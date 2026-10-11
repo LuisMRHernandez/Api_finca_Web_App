@@ -4,7 +4,7 @@ from typing import List
 import secrets
 
 from app.database.connection import get_db
-from app.database.models import Dispositivos as Dispositivo, Finca
+from app.database.models import Dispositivo, Finca
 from app.schemas.dispositivo_schema import (
     DispositivoCreate,
     DispositivoResponse,
