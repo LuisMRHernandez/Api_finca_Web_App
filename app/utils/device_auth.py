@@ -6,7 +6,7 @@ from datetime import datetime
 from jose import jwt, JWTError
 
 from app.database.connection import get_db
-from app.database.models import Dispositivos, Finca
+from app.database.models import Dispositivo, Finca
 from app.utils.security import SECRET_KEY, ALGORITHM
 
 # No lanza error automaticamente si no viene el header Authorization:
@@ -46,8 +46,8 @@ def get_auth_context(
     # 1) Token fijo de dispositivo (ESP32 enviando directo por WiFi)
     if x_device_token:
         dispositivo = (
-            db.query(Dispositivos)
-            .filter(Dispositivos.token == x_device_token, Dispositivos.activo == True)
+            db.query(Dispositivo)
+            .filter(Dispositivo.token == x_device_token, Dispositivo.activo == True)
             .first()
         )
         if not dispositivo:
